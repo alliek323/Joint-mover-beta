@@ -245,6 +245,50 @@ const sl=$("#sl"),span=d.max-d.min;sl.value=x;sl.setAttribute("aria-valuetext",`
 sl.style.setProperty("--a",(Math.min(x,z)-d.min)/span*100+"%");sl.style.setProperty("--b",(Math.max(x,z)-d.min)/span*100+"%")}
 function setVal(x){const d=DEF[mode][sel[mode]];VALS[mode][sel[mode]]=clamp(Math.round(x),d.min,d.max);upd()}
 
+/* ---------- physical exam ---------- */
+const EXM="var(--mute)",EXQs=p=>p[0].toFixed(1)+","+p[1].toFixed(1);
+const EXS={
+knee:{n:"Knee stress test",k:"st",min:-100,max:100,z:0,p:"Valgus stress",q:"Varus stress",bone:["Femur","Tibia"],lig:["MCL","LCL"],rule:"The examiner steadies the joint line with one hand and holds the ankle with the other, then bends the knee sideways (tested at 0° and about 30° of flexion). Patient’s right knee, front view.",tip:"Valgus stress (push medially at the lateral knee, pull the ankle laterally) loads the medial collateral ligament (MCL). Varus stress loads the lateral collateral ligament (LCL). Compare with the other side. Opening is exaggerated for teaching."},
+elbow:{n:"Elbow stress test",k:"st",min:-100,max:100,z:0,p:"Valgus stress",q:"Varus stress",bone:["Humerus","Forearm"],lig:["UCL (medial)","LCL complex (lateral)"],rule:"With the elbow slightly flexed (about 20–30°) and the humerus steadied, the examiner bends the forearm sideways. Patient’s right elbow, front view.",tip:"Valgus stress loads the ulnar collateral ligament (medial), the one injured in throwing athletes. Varus stress loads the lateral collateral ligament complex. Opening is exaggerated for teaching."},
+hip1:{n:"Hip flexion (supine)",k:"hip",min:0,max:120,z:45,p:"Flexion",q:"Extension",rule:"The patient lies supine with knees bent and feet flat on the table. The examiner steadies the pelvis and passively lifts the right knee toward the chest, then lowers it back toward the table.",tip:"Normal passive hip flexion is about 120°. Lowering the thigh back toward flat is extension returning to neutral. A hard stop or pain early in the arc is a finding to explain; compare sides."},
+hip2:{n:"Hip extension (Thomas)",k:"hip",min:-15,max:30,z:0,p:"Flexion",q:"Extension",rule:"Thomas test: the patient lies supine at the table edge and hugs one knee to the chest to flatten the lumbar spine. The other leg hangs off the edge and the examiner watches the thigh.",tip:"A normal hip lets the hanging thigh lie level or drop below the table (extension). If the thigh stays lifted (flexion), suspect hip flexor tightness (positive Thomas test)."}};
+const EXV={knee:0,elbow:0,hip1:45,hip2:0};let exSel="knee",lig="normal";
+const exTh=x=>x>=0?x/100*(lig==="medial"?16:4):x/100*(lig==="lateral"?16:4);
+const arrow=(p,q)=>{const dx=q[0]-p[0],dy=q[1]-p[1],l=Math.hypot(dx,dy)||1,u=[dx/l,dy/l],n=[-u[1],u[0]],b=[q[0]-u[0]*11,q[1]-u[1]*11];return `<path d="${L(p,q)}" ${st(AC,4)}/><polygon points="${EXQs(q)} ${EXQs([b[0]+n[0]*6,b[1]+n[1]*6])} ${EXQs([b[0]-n[0]*6,b[1]-n[1]*6])}" style="fill:${AC}"/>`};
+const hand=p=>`<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="17" ry="11" ${st(AC,3,C)}/>`;
+
+function stSVG(x){const knee=exSel==="knee",w=knee?48:30,J=[200,235],Ld=165,th=exTh(x),pv=[th>=0?J[0]-w/2:J[0]+w/2,J[1]+4],
+rot=p=>{const c=Math.cos(rad(th)),s=Math.sin(rad(th)),dx=p[0]-pv[0],dy=p[1]-pv[1];return[pv[0]+dx*c-dy*s,pv[1]+dx*s+dy*c]},
+bn=`style="fill:var(--card);stroke:var(--bone);stroke-width:4"`,nm=EXS[exSel].bone,
+lg=(sx,on,torn)=>{const a=[sx,J[1]-26],b=rot([sx,J[1]+34]);return torn?`<path d="${L(a,b)}" style="stroke:var(--bad);stroke-width:4;stroke-dasharray:5 11;stroke-linecap:round;fill:none"/>`:`<path d="${L(a,b)}" style="stroke:${on?"var(--bad)":EXM};stroke-width:${on?3+Math.min(1,Math.abs(th)/12)*5:3};stroke-linecap:round;fill:none"/>`};
+let o=`<text x="10" y="24" class="lbl">← Lateral</text><text x="350" y="24" text-anchor="end" class="lbl">Medial →</text><rect x="${J[0]-w/2}" y="40" width="${w}" height="${J[1]-40}" rx="10" ${bn}/><rect x="${J[0]-w/2}" y="${J[1]+4}" width="${w}" height="${Ld}" rx="10" transform="rotate(${th.toFixed(2)} ${pv[0]} ${pv[1]})" ${bn}/><text x="${J[0]}" y="${J[1]-90}" text-anchor="middle" class="lbl">${nm[0]}</text><text x="${J[0]}" y="${J[1]+110}" text-anchor="middle" class="lbl">${nm[1]}</text>`;
+o+=lg(J[0]+w/2+3,th>1,lig==="medial")+lg(J[0]-w/2-3,th<-1,lig==="lateral");
+if(Math.abs(x)>=3){const sd=x>0?-1:1,len=10+26*Math.abs(x)/100,hx=J[0]+sd*(w/2+50),D=rot([J[0],J[1]+Ld-14]),dx=D[0]-sd*(w/2+50);
+o+=`<ellipse cx="${hx}" cy="${J[1]}" rx="17" ry="24" ${st(AC,3,C)}/>`+arrow([hx-sd*18,J[1]],[hx-sd*(18+len),J[1]])+`<ellipse cx="${dx.toFixed(1)}" cy="${D[1].toFixed(1)}" rx="17" ry="24" ${st(AC,3,C)}/>`+arrow([dx+sd*18,D[1]],[dx+sd*(18+len),D[1]])}
+return `<svg viewBox="0 0 360 440" role="img" aria-label="Examiner applying a sideways stress to the joint">${o}<text x="180" y="430" text-anchor="middle" class="lbl">Patient’s right ${knee?"knee":"elbow"}, front view (opening exaggerated)</text></svg>`}
+
+const kS=(H,f,hang)=>{const K=[H[0]+82*Math.cos(rad(f)),H[1]-82*Math.sin(rad(f))];let A;if(hang)A=[K[0],K[1]+80];else{const dy=244-K[1];if(dy<=80)A=[K[0]+Math.sqrt(6400-dy*dy),244];else{const g=Math.max(0,f-90)*.8;A=[K[0]+Math.sin(rad(g))*80,K[1]+Math.cos(rad(g))*80]}}return[K,A]};
+const legP=(H,f,hang,c)=>{const[K,A]=kS(H,f,hang);return `<path d="${L(H,K)}" ${st(c,18)}/><path d="${L(K,A)}" ${st(c,13)}/><path d="${L(A,[A[0]+18,A[1]])}" ${st(c,8)}/>`};
+const supine=(H,x1)=>`<rect x="10" y="250" width="${x1-10}" height="22" rx="6" style="fill:var(--line)"/><path d="M40,272L40,330M${x1-30},272L${x1-30},330" style="stroke:var(--line);stroke-width:6;stroke-linecap:round"/><path d="${L([66,232],H)}" ${st(B,30)}/><circle cx="44" cy="226" r="18" ${st(B,4,C)}/><text x="20" y="196" class="lbl">← Head</text><text x="340" y="196" text-anchor="end" class="lbl">Feet →</text><path d="${L(H,[H[0]+150,H[1]])}" style="stroke:var(--ghost);stroke-width:2;stroke-dasharray:5 5;fill:none"/><text x="340" y="224" text-anchor="end" class="lbl">Table plane</text>`;
+const exArc=(H,f)=>{if(Math.abs(f)<1)return"";const p=[H[0]+38,H[1]],q=[H[0]+38*Math.cos(rad(f)),H[1]-38*Math.sin(rad(f))],m=[H[0]+58*Math.cos(rad(f/2)),H[1]-58*Math.sin(rad(f/2))];return `<path d="M${EXQs(p)}A38 38 0 0 ${f>0?0:1} ${EXQs(q)}" style="fill:none;stroke:var(--acc);stroke-width:3"/><text x="${m[0].toFixed(1)}" y="${(m[1]+4).toFixed(1)}" text-anchor="middle" style="fill:var(--acc);font-weight:700;font-size:13px">${Math.abs(f)}°</text>`};
+function hip1SVG(f){const H=[188,232],[K]=kS(H,f,false),m=[-Math.sin(rad(f)),-Math.cos(rad(f))],c=[K[0]-m[0]*16,K[1]-m[1]*16];
+return `<svg viewBox="0 0 360 330" role="img" aria-label="Patient supine with knees bent while the examiner flexes the right hip">${supine(H,350)}${legP(H,45,false,EXM)}${legP(H,f,false,B)}${exArc(H,Math.round(f))}${hand([H[0]-22,H[1]-26])}${hand(c)}${f<118?arrow(K,[K[0]+m[0]*42,K[1]+m[1]*42]):""}<text x="180" y="318" text-anchor="middle" class="lbl">Supine, knees bent: examiner flexes the right hip</text></svg>`}
+function hip2SVG(f){const H=[188,232],[K]=kS(H,f,true),[K2]=kS(H,115,false);
+return `<svg viewBox="0 0 360 330" role="img" aria-label="Thomas test: patient supine at the table edge, one knee hugged, the other leg hanging">${supine(H,205)}${legP(H,115,false,EXM)}<path d="${L([92,228],K2)}" ${st(EXM,7)}/>${legP(H,f,true,B)}${exArc(H,Math.round(f))}${hand([K[0],K[1]-28])}${arrow([K[0],K[1]-14],[K[0],K[1]+12])}<text x="180" y="318" text-anchor="middle" class="lbl">Thomas test: left knee hugged, right thigh hangs off the edge</text></svg>`}
+const exSVG=()=>EXS[exSel].k==="st"?stSVG(EXV[exSel]):exSel==="hip1"?hip1SVG(EXV.hip1):hip2SVG(EXV.hip2);
+function exInfo(){const d=EXS[exSel],x=EXV[exSel];
+if(d.k==="st"){const th=exTh(x);if(Math.abs(x)<3)return["No stress applied","Drag the slider to bend the joint sideways"];const val=x>0,nm=d.lig[val?0:1],torn=lig===(val?"medial":"lateral");
+return[val?"Valgus stress":"Varus stress",`Tests the ${nm}. The joint line opens ${Math.abs(th).toFixed(0)}° on the ${val?"medial":"lateral"} side. ${torn?"Excess gapping and a soft end-point: suggests a "+nm+" injury.":"Firm end-point, little opening: "+nm+" intact."}`]}
+if(exSel==="hip1")return[x<2?"Neutral (leg flat)":"Flexion",`${x}° of hip flexion`];
+return[x>2?"Flexion (thigh lifted)":x<-2?"Extension (thigh dropped)":"Neutral (thigh level)",`${Math.abs(x)}° ${x>=0?"above":"below"} the table plane`]}
+function exam(){const d=EXS[exSel],x=EXV[exSel];
+$("#stage").innerHTML=`<div class="fig">${exSVG()}</div>`;
+$("#picker").innerHTML=`<p class="label" id="exam-picker">Physical examination</p><div class="chips" role="group" aria-labelledby="exam-picker">${Object.keys(EXS).map(k=>`<button class="btn sm" aria-pressed="${k===exSel}" data-e="${k}">${EXS[k].n}</button>`).join("")}</div>${d.k==="st"?`<p class="label" style="margin-top:12px">Illustration</p><div class="chips">${[["normal","Normal ligaments"],["medial","Medial ligament torn"],["lateral","Lateral ligament torn"]].map(([k,t])=>`<button class="btn sm" aria-pressed="${k===lig}" data-l="${k}">${t}</button>`).join("")}</div>`:""}`;
+$("#controls").innerHTML=`<div class="ends"><span>← ${d.q}</span><span>${d.p} →</span></div><div class="slrow"><button class="step" data-step="-1" aria-label="Decrease movement">−</button><input type="range" id="sl" min="${d.min}" max="${d.max}" step="1" value="${x}" aria-label="${d.n}"><button class="step" data-step="1" aria-label="Increase movement">+</button></div><div class="read" id="read"></div><button class="btn sm quiet" id="rs">Reset</button>`;
+$("#notes").innerHTML=`<h2>How to perform it</h2><p>${d.rule}</p><h2>Interpretation</h2><p>${d.tip}</p>`;
+exUpd()}
+function exUpd(){const x=EXV[exSel],d=EXS[exSel];$("#stage").innerHTML=`<div class="fig">${exSVG()}</div>`;const[a,b]=exInfo();$("#read").innerHTML=`<span class="term${Math.abs(x)<3?"":" on"}">${a}</span><span class="amt">${b}</span>`;const sl=$("#sl");if(sl){sl.value=x;const span=d.max-d.min;sl.style.setProperty("--a",(Math.min(x,d.z)-d.min)/span*100+"%");sl.style.setProperty("--b",(Math.max(x,d.z)-d.min)/span*100+"%")}}
+
 /* ---------- study mode ---------- */
 let Q=null,qn=0,qcat="all",sc={r:0,t:0,s:0},best=0,showGhost=true;
 try{best=+localStorage.getItem("jmBestStreak")||0}catch(e){}
@@ -277,20 +321,22 @@ quiz();const nx=$("#nx");if(nx)nx.focus({preventScroll:true})}
 function next(){newQ();quiz();const o=$(".opt");if(o)o.focus({preventScroll:true})}
 
 /* ---------- wiring ---------- */
-const TABS=[["fe","Flexion / Extension"],["vv","Valgus / Varus"],["rot","Rotation"],["quiz","Study mode"]];
+const TABS=[["fe","Flexion / Extension"],["vv","Valgus / Varus"],["rot","Rotation"],["exam","Physical exam"],["quiz","Study mode"]];
 $("#tabs").innerHTML=TABS.map(([k,t])=>`<button class="btn" aria-pressed="false" data-m="${k}">${t}</button>`).join("");
-function render(){document.querySelectorAll("#tabs [data-m]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.m===mode)));mode==="quiz"?quiz():explore()}
+function render(){document.querySelectorAll("#tabs [data-m]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.m===mode)));mode==="quiz"?quiz():mode==="exam"?exam():explore()}
 /* Re-rendering replaces buttons; put keyboard focus back on the same one. */
 const refocus=(e,sel)=>{if(e.detail===0){const b=document.querySelector(sel);if(b)b.focus()}};
 document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
 if(t.dataset.m){mode=t.dataset.m;render()}
 else if(t.dataset.j){sel[mode]=t.dataset.j;explore();refocus(e,`[data-j="${t.dataset.j}"]`)}
-else if(t.dataset.step){setVal(VALS[mode][sel[mode]]+5*t.dataset.step)}
-else if(t.id==="rs"){setVal(Z[mode][sel[mode]])}
+else if(t.dataset.e){exSel=t.dataset.e;exam();refocus(e,`[data-e="${t.dataset.e}"]`)}
+else if(t.dataset.l){lig=t.dataset.l;exam();refocus(e,`[data-l="${t.dataset.l}"]`)}
+else if(t.dataset.step){if(mode==="exam"){const d=EXS[exSel];EXV[exSel]=clamp(EXV[exSel]+5*+t.dataset.step,d.min,d.max);exUpd()}else setVal(VALS[mode][sel[mode]]+5*t.dataset.step)}
+else if(t.id==="rs"){if(mode==="exam"){EXV[exSel]=EXS[exSel].z;exam()}else setVal(Z[mode][sel[mode]])}
 else if(t.dataset.cat){qcat=t.dataset.cat;Q=null;quiz();refocus(e,`[data-cat="${qcat}"]`)}
 else if(t.dataset.o){answer(t.dataset.o)}
 else if(t.id==="nx"){next()}});
-document.addEventListener("input",e=>{if(e.target.id==="sl")setVal(+e.target.value)});
+document.addEventListener("input",e=>{if(e.target.id==="sl"){if(mode==="exam"){EXV[exSel]=+e.target.value;exUpd()}else setVal(+e.target.value)}});
 document.addEventListener("change",e=>{if(e.target.id==="gh"){showGhost=e.target.checked;quiz()}});
 document.addEventListener("keydown",e=>{if(mode!=="quiz"||!Q||e.metaKey||e.ctrlKey||e.altKey||e.target.tagName==="INPUT")return;
 if(!Q.done&&/^[1-4]$/.test(e.key)){answer(Q.opts[+e.key-1]);e.preventDefault()}
