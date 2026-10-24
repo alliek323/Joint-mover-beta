@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Joint Movement Trainer</title>
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--ink:#1d2330;--mute:#5d6678;--line:#d9dce3;--acc:#2f6fed;--bone:#3a4256;--ghost:#c3c9d6;--good:#1f9d62;--bad:#d64545;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151c;--card:#1b202b;--ink:#e8ebf2;--mute:#9aa3b5;--line:#2d3444;--acc:#6b9bff;--bone:#c9d0e0;--ghost:#3a4256;--good:#3ccf8a;--bad:#ff6b6b}}
+:root[data-theme="dark"]{--bg:#12151c;--card:#1b202b;--ink:#e8ebf2;--mute:#9aa3b5;--line:#2d3444;--acc:#6b9bff;--bone:#c9d0e0;--ghost:#3a4256;--good:#3ccf8a;--bad:#ff6b6b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0 0 2px}.sub{color:var(--mute);margin:0 0 14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+button{font:inherit;color:var(--ink);cursor:pointer}
+.tab,.chip,.btn,.opt{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 13px}
+.tab.on,.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+svg{width:100%;height:auto;max-height:680px;display:block}
+.lbl{fill:var(--mute);font-size:12px}.mk{fill:var(--acc);fill-opacity:.22;stroke:var(--acc);stroke-width:2}
+.rule{margin:0 0 12px;color:var(--mute)}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.ends{display:flex;justify-content:space-between;font-weight:600;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc);margin:6px 0}
+.read{display:flex;flex-direction:column;background:var(--bg);border-radius:10px;padding:10px 12px;margin:8px 0 12px;color:var(--mute)}
+.big{font-size:20px;font-weight:700;color:var(--ink)}
+.tip{margin:0 0 12px}.meta{margin:0 0 6px;color:var(--mute)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.opt{text-align:center;padding:12px 8px}.opt.good{background:var(--good);border-color:var(--good);color:#fff}.opt.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+.fb{padding:10px 12px;border-radius:10px;border:1px solid var(--line);margin-bottom:10px}.fb.good{border-color:var(--good)}.fb.bad{border-color:var(--bad)}
+.score{color:var(--mute);margin:12px 0 6px}.ck{color:var(--mute);font-size:13px}.foot{color:var(--mute);font-size:12px;margin-top:14px}
+</style></head><body>
+<div class="wrap">
+<h1>Joint Movement Trainer</h1>
+<p class="sub">Move a joint, watch the term change, then test yourself in study mode.</p>
+<div class="tabs" id="tabs"></div>
+<div class="grid"><div class="card" id="stage"></div><div class="card" id="panel"></div></div>
+<p class="foot">Flexion/extension conventions follow Tom Morrison’s “Flexion &amp; Extension: In Detail”. Valgus/varus and rotation follow standard clinical usage. Study aid, not a substitute for your anatomy text.</p>
+</div>
+<script>
+const $=s=>document.querySelector(s),rad=d=>d*Math.PI/180,add=(p,q)=>[p[0]+q[0],p[1]+q[1]],
+v=(t,l)=>[Math.sin(rad(t))*l,Math.cos(rad(t))*l],vs=(s,t,l)=>[s*Math.sin(rad(t))*l,Math.cos(rad(t))*l],
+L=(...p)=>"M"+p.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join("L"),
+st=(c,w,f="none")=>`style="stroke:${c};stroke-width:${w};fill:${f};stroke-linecap:round;stroke-linejoin:round"`,
+ri=(a,b)=>Math.round(a+Math.random()*(b-a)),pick=a=>a[Math.floor(Math.random()*a.length)],
+shuf=a=>a.map(x=>[Math.random(),x]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+const B="var(--bone)",G="var(--ghost)",C="var(--card)";
+
+const DEF={
+fe:{
+neck:{n:"Neck",min:-60,max:50,p:"Flexion",q:"Extension",tip:"Chin toward chest is flexion (the angle at the front shrinks). Head tilted back is extension."},
+shoulder:{n:"Shoulder",min:-60,max:180,p:"Flexion",q:"Extension",tip:"Arm swinging up in front and overhead is flexion. Arm swinging behind you is extension. It is defined by the front of the body, which is why overhead feels “backwards”."},
+elbow:{n:"Elbow",min:0,max:145,p:"Flexion",q:"Extension",tip:"A hinge joint. Bending closes the angle between humerus and forearm (flexion). Straightening opens it (extension)."},
+wrist:{n:"Wrist",min:-70,max:80,p:"Palmar flexion",q:"Dorsiflexion",tip:"Palm toward forearm is palmar flexion (usually just called flexion). Back of hand toward forearm is dorsiflexion (usually called extension)."},
+hip:{n:"Hip",min:-20,max:120,p:"Flexion",q:"Extension",tip:"Thigh lifting forward toward the torso is flexion (“closing” the hip). Standing tall or taking the thigh behind you is extension (“opening”)."},
+knee:{n:"Knee",min:0,max:140,p:"Flexion",q:"Extension",tip:"Heel moving toward the buttock is flexion. Straightening the leg is extension."},
+ankle:{n:"Ankle",min:-50,max:20,p:"Dorsiflexion",q:"Plantarflexion",tip:"Toes up toward the shin is dorsiflexion. Toes pointing down (tiptoes) is plantarflexion. By convention the ankle only “flexes” in both directions."}},
+vv:{
+knee:{n:"Knee",min:-16,max:25,p:"Valgus",q:"Varus",tip:"Valgus: lower leg angles away from the midline (knock-knees, genu valgum). Varus: lower leg angles toward the midline (bow-legs, genu varum). Adult knees normally sit around 5–7° valgus."},
+elbow:{n:"Elbow",min:-25,max:30,p:"Valgus",q:"Varus",tip:"Cubitus valgus: forearm angles away from the body (a carrying angle of about 10–15° is normal). Cubitus varus (gunstock deformity): forearm angles toward the body."},
+ankle:{n:"Ankle",min:-20,max:20,p:"Valgus",q:"Varus",tip:"Hindfoot valgus: heel tilts away from the midline. Hindfoot varus: heel tilts toward the midline."},
+hip:{n:"Hip",min:95,max:160,p:"Coxa valga",q:"Coxa vara",tip:"At the hip this is the femoral neck-shaft angle. Normal is about 125°. Above about 135° is coxa valga (neck more vertical). Below about 120° is coxa vara (neck more horizontal)."}},
+rot:{
+shoulder:{n:"Shoulder",min:-70,max:70,p:"Internal rotation",q:"External rotation",tip:"Arm at your side, elbow bent 90°, forearm pointing forward. Swinging the hand toward your belly is internal rotation. Swinging it out to the side is external rotation."},
+hip:{n:"Hip",min:-45,max:45,p:"Internal rotation",q:"External rotation",tip:"Turning the thigh so the kneecap and toes face toward the midline is internal rotation. Kneecap and toes turning outward is external rotation."}}};
+const RULE={
+fe:"Flexion decreases the angle between two bones (closing, bending). Extension increases it (opening, straightening). For joints that move in many directions, judge by the front of the body: forward motion is flexion, backward is extension.",
+vv:"Look at the distal segment (the part further from the trunk) and ask where it points relative to the proximal segment. Valgus: it angles away from the midline. Varus: it angles toward the midline.",
+rot:"Internal (medial) rotation turns the front surface of the limb toward the midline. External (lateral) rotation turns it away from the midline."};
+const Z={fe:{neck:0,shoulder:0,elbow:0,wrist:0,hip:0,knee:0,ankle:0},vv:{knee:0,elbow:0,ankle:0,hip:125},rot:{shoulder:0,hip:0}};
+const VALS={fe:{...Z.fe},vv:{...Z.vv},rot:{...Z.rot}};
+let mode="fe",sel={fe:"elbow",vv:"knee",rot:"shoulder"};
+
+/* ---------- side view (flexion/extension) ---------- */
+function feP(A){const S=[170,150],H=[170,255],a=A.neck,h=add(S,[Math.sin(rad(a))*34,-Math.cos(rad(a))*34]),
+E=add(S,v(A.shoulder,62)),W=add(E,v(A.shoulder+A.elbow,54)),T=add(W,v(A.shoulder+A.elbow+A.wrist,28)),
+K=add(H,v(A.hip,82)),N=add(K,v(A.hip-A.knee,78)),fa=A.hip-A.knee+90+A.ankle,
+T2=add(N,v(fa,40)),Hl=add(N,v(fa,-10)),nose=[h[0]+Math.cos(rad(a))*17,h[1]+Math.sin(rad(a))*17];
+return{S,H,h,E,W,T,K,N,T2,Hl,nose}}
+function feBody(A,c){const P=feP(A);return `<path d="${L(P.S,P.h)}" ${st(c,6)}/><path d="${L(P.S,P.H)}" ${st(c,10)}/><path d="${L(P.S,P.E,P.W)}" ${st(c,8)}/><path d="${L(P.W,P.T)}" ${st(c,5)}/><path d="${L(P.H,P.K,P.N)}" ${st(c,10)}/><path d="${L(P.Hl,P.T2)}" ${st(c,7)}/><circle cx="${P.h[0]}" cy="${P.h[1]}" r="17" ${st(c,4,C)}/><circle cx="${P.nose[0]}" cy="${P.nose[1]}" r="3.5" style="fill:${c}"/>`}
+function feSVG(A,j,g){const P=feP(A),m={neck:[(P.S[0]+P.h[0])/2,(P.S[1]+P.h[1])/2],shoulder:P.S,elbow:P.E,wrist:P.W,hip:P.H,knee:P.K,ankle:P.N}[j];
+return `<svg viewBox="0 0 360 440" role="img" aria-label="Side view of the body"><path d="M20,424L340,424" style="stroke:var(--line);stroke-width:2"/><text x="340" y="24" text-anchor="end" class="lbl">Anterior (front) →</text><text x="20" y="24" class="lbl">← Posterior</text>${g?feBody(Z.fe,G):""}${feBody(A,B)}<circle cx="${m[0]}" cy="${m[1]}" r="17" class="mk"/></svg>`}
+
+/* ---------- front view (valgus/varus) ---------- */
+function vvBody(V,c,arm=true){let o=`<path d="${L([180,70],[180,225])}" ${st(c,10)}/><path d="${L([128,95],[232,95])}" ${st(c,9)}/><path d="${L([156,225],[204,225])}" ${st(c,9)}/><circle cx="180" cy="45" r="20" ${st(c,4,C)}/>`,pts=[];
+for(const s of[-1,1]){const Sh=[180+s*52,95],E=add(Sh,[0,72]),W=add(E,vs(s,V.elbow,66)),Hd=add(W,vs(s,V.elbow,22)),Hp=[180+s*24,225],K=add(Hp,vs(s,5,90)),N=add(K,vs(s,5+V.knee,90)),lh=5+V.knee+V.ankle,Hl=add(N,vs(s,lh,16)),p=[Math.cos(rad(lh))*10,-s*Math.sin(rad(lh))*10];
+o+=`<path d="${arm?L(Sh,E,W,Hd):L(Sh,E)}" ${st(c,8)}/><path d="${L(Hp,K,N,Hl)}" ${st(c,10)}/><path d="${L([Hl[0]-p[0],Hl[1]-p[1]],[Hl[0]+p[0],Hl[1]+p[1]])}" ${st(c,6)}/>`;pts.push({elbow:E,knee:K,ankle:N})}
+return[o,pts]}
+function hipB(t,c){const hx=130,hy=120,J=[hx+100*Math.sin(rad(t)),hy-100*Math.cos(rad(t))];
+return[`<path d="M30,70Q70,70 ${hx-38},${hy}A38 38 0 0 1 ${hx+38},${hy}L${hx+84},${hy-60}" ${st(c,8)}/><path d="${L(J,[hx,hy])}" ${st(c,12)}/><path d="${L(J,[J[0],J[1]+190])}" ${st(c,14)}/><circle cx="${hx}" cy="${hy}" r="28" ${st(c,4,C)}/>`,J]}
+function hipSVG(t,g){const[b,J]=hipB(t,B),d=[-Math.sin(rad(t)),Math.cos(rad(t))],a=[J[0],J[1]+40],e=add(J,[d[0]*40,d[1]*40]),bx=d[0],by=1+d[1],bl=Math.hypot(bx,by),tx=J[0]+bx/bl*66,ty=J[1]+by/bl*66;
+return `<svg viewBox="0 0 360 440" role="img" aria-label="Femoral neck-shaft angle"><path d="M30,40L30,430" style="stroke:var(--line);stroke-width:2;stroke-dasharray:6 5"/><text x="38" y="34" class="lbl">Midline</text><text x="350" y="430" text-anchor="end" class="lbl">Lateral →</text>${g?hipB(125,G)[0]:""}${b}<path d="M${a[0]},${a[1]}A40 40 0 0 1 ${e[0].toFixed(1)},${e[1].toFixed(1)}" style="fill:none;stroke:var(--acc);stroke-width:3"/><text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" style="fill:var(--acc);font-weight:700;font-size:15px">${t}°</text><circle cx="130" cy="120" r="36" class="mk"/></svg>`}
+function vvSVG(V,j,g){if(j==="hip")return hipSVG(V.hip,g);const[o,pts]=vvBody(V,B);
+return `<svg viewBox="0 0 360 440" role="img" aria-label="Front view of the body"><path d="M180,20L180,440" style="stroke:var(--line);stroke-width:2;stroke-dasharray:6 5"/><text x="186" y="16" class="lbl">Midline</text><text x="4" y="436" class="lbl">← lateral</text><text x="356" y="436" text-anchor="end" class="lbl">lateral →</text><text x="4" y="16" class="lbl">Patient’s R</text><text x="356" y="16" text-anchor="end" class="lbl">Patient’s L</text>${g?vvBody(Z.vv,G)[0]:""}${o}${pts.map(p=>`<circle cx="${p[j][0]}" cy="${p[j][1]}" r="16" class="mk"/>`).join("")}</svg>`}
+
+/* ---------- rotation: human figure + joint close-up ---------- */
+function rotSVG(R,j,g){const a=R[j],sn=Math.sin(rad(a)),hip=j==="hip",dsh="stroke:var(--ghost);stroke-width:2;stroke-dasharray:4 3;fill:none",AC="var(--acc)",
+P=(O,r,ph)=>[O[0]+r*Math.cos(rad(ph)),O[1]-r*Math.sin(rad(ph))],f=n=>n.toFixed(1),Q=p=>f(p[0])+","+f(p[1]);
+let o=`<path d="M180,20L180,440" style="stroke:var(--line);stroke-width:2;stroke-dasharray:6 5"/><text x="186" y="16" class="lbl">Midline</text><text x="4" y="16" class="lbl">Patient’s R</text><text x="356" y="16" text-anchor="end" class="lbl">Patient’s L</text>${vvBody(Z.vv,B,hip)[0]}<text x="180" y="436" text-anchor="middle" class="lbl">${hip?"Anatomical position, legs straight":"Upper arms at the sides, elbows bent 90°"}</text>`;
+for(const s of[-1,1]){
+if(hip){const K=add([180+s*24,225],vs(s,5,90)),N=add(K,vs(s,5,90)),fy=N[1]+12;
+o+=(g?`<circle cx="${f(K[0])}" cy="${f(K[1])}" r="9" style="${dsh}"/>`:"")+`<circle cx="${f(K[0]-s*22*sn)}" cy="${f(K[1]-2)}" r="9" ${st(AC,2.5,C)}/><ellipse cx="${f(N[0])}" cy="${f(fy)}" rx="11" ry="6" ${st(B,3,C)}/><circle cx="${f(N[0]-s*22*sn)}" cy="${f(fy+2)}" r="4" style="fill:${AC}"/>`}
+else{const E=[180+s*52,167],H=[E[0]-s*62*sn,E[1]+8];
+o+=(g?`<circle cx="${E[0]}" cy="${E[1]+8}" r="10" style="${dsh}"/>`:"")+`<path d="${L(E,H)}" ${st(B,8)}/><circle cx="${f(H[0])}" cy="${H[1]}" r="10" ${st(AC,2.5,C)}/>`}}
+const y0=455,O=[150,565];
+o+=`<path d="M20,${y0}L340,${y0}" style="stroke:var(--line);stroke-width:1"/><text x="180" y="${y0+16}" text-anchor="middle" class="lbl">Right ${hip?"hip":"shoulder"} seen from above</text><text x="350" y="${y0+36}" text-anchor="end" class="lbl">Anterior ↑</text><ellipse cx="${O[0]-88}" cy="${O[1]}" rx="60" ry="30" ${st(G,3)}/><path d="M${O[0]-88},${O[1]-44}L${O[0]-88},${O[1]+44}" style="stroke:var(--line);stroke-width:2;stroke-dasharray:6 5"/><text x="${O[0]-88}" y="${O[1]+50}" text-anchor="middle" class="lbl">Midline</text><path d="M${O[0]-30},${O[1]}L340,${O[1]}" style="stroke:var(--line);stroke-width:1;stroke-dasharray:3 4"/><text x="340" y="${O[1]-5}" text-anchor="end" class="lbl">Coronal plane</text>`;
+let t1,t2,t3;
+if(hip){const T0=P(O,62,-15),T=P(O,62,-15+a),ang=15-a,k=P(T,40,90+a);
+o+=`<path d="M${Q(P(O,34,70))}A34 34 0 1 0 ${Q(P(O,34,330))}" ${st(B,5)}/><path d="${L(O,T0)}" style="${dsh}"/><circle cx="${f(T0[0])}" cy="${f(T0[1])}" r="13" style="${dsh}"/><path d="${L(T0,P(T0,40,90))}" style="${dsh}"/><path d="${L(O,T)}" ${st(B,9)}/><circle cx="${O[0]}" cy="${O[1]}" r="24" ${st(B,4,C)}/><text x="${O[0]}" y="${O[1]+4}" text-anchor="middle" class="lbl">Head</text><path d="${L(T,k)}" ${st(AC,3)}/><circle cx="${f(k[0])}" cy="${f(k[1])}" r="5" style="fill:${AC}"/><circle cx="${f(T[0])}" cy="${f(T[1])}" r="13" ${st(AC,3,C)}/><text x="${f(T[0])}" y="${f(T[1]+4)}" text-anchor="middle" class="lbl">GT</text>`;
+t1=`Neck to coronal plane: ${Math.abs(ang)}° ${ang>0?"forward (anteversion)":ang<0?"backward (retroversion)":"(neck in profile)"}`;
+t2=a>2?"Internal rotation: greater trochanter swings forward":a<-2?"External rotation: greater trochanter swings back":"Neutral: kneecap points straight ahead";
+t3=a===15?"About 15° internal rotation shows the neck in profile on an AP X-ray":"GT = greater trochanter. Arrow = kneecap direction."}
+else{const pt=P(O,72,90+a),lb=P(O,86,90+a),gt=P(O,26,10+a),lt=P(O,26,80+a),tg=P(O,43,10+a),tl=P(O,43,80+a);
+o+=`<path d="M${Q(P(O,36,130))}A36 36 0 0 0 ${Q(P(O,36,250))}" ${st(B,6)}/><text x="${O[0]-40}" y="${O[1]-42}" text-anchor="middle" class="lbl">Glenoid</text><path d="${L(O,P(O,72,90))}" style="${dsh}"/><circle cx="${O[0]}" cy="${O[1]}" r="26" ${st(B,4,C)}/><path d="M${Q(P(O,26,150+a))}A26 26 0 0 0 ${Q(P(O,26,230+a))}" ${st(AC,6)}/><circle cx="${f(gt[0])}" cy="${f(gt[1])}" r="6" style="fill:${B}"/><circle cx="${f(lt[0])}" cy="${f(lt[1])}" r="6" style="fill:${B}"/><text x="${f(tg[0])}" y="${f(tg[1]+4)}" text-anchor="middle" class="lbl">GT</text><text x="${f(tl[0])}" y="${f(tl[1]+4)}" text-anchor="middle" class="lbl">LT</text><path d="${L(O,pt)}" ${st(AC,4)}/><circle cx="${f(pt[0])}" cy="${f(pt[1])}" r="6" style="fill:${AC}"/><text x="${f(lb[0])}" y="${f(lb[1])}" text-anchor="middle" class="lbl">forearm</text>`;
+t1=a>2?"Internal rotation: greater tuberosity swings forward":a<-2?"External rotation: greater tuberosity swings back":"Neutral: GT faces lateral, LT faces forward";
+t2="The humeral head spins in the glenoid; the forearm follows";
+t3="GT = greater tuberosity. LT = lesser tuberosity. Blue arc = joint surface."}
+return `<svg viewBox="0 0 360 670" role="img" aria-label="Human figure with the limb rotated, plus a close-up of the joint from above">${o}<text x="180" y="628" text-anchor="middle" style="fill:var(--ink);font-size:13px;font-weight:600">${t1}</text><text x="180" y="645" text-anchor="middle" class="lbl">${t2}</text><text x="180" y="661" text-anchor="middle" class="lbl">${t3}</text></svg>`}
+
+const stageSVG=(m,V,j,g)=>m==="fe"?feSVG(V,j,g):m==="vv"?vvSVG(V,j,g):rotSVG(V,j,g);
+function term(m,j,x){const d=DEF[m][j];if(m==="vv"&&j==="hip")return x<120?d.q:x>135?d.p:"Normal neck-shaft angle";return Math.abs(x)<2?"Neutral":x>0?d.p:d.q}
+const unit=(m,j,x)=>m==="vv"&&j==="hip"?`Neck-shaft angle ${x}° (normal ≈ 125°)`:`${Math.abs(x)}° from neutral`;
+
+/* ---------- explore mode ---------- */
+function explore(){const D=DEF[mode],j=sel[mode],d=D[j],x=VALS[mode][j];
+$("#panel").innerHTML=`<p class="rule">${RULE[mode]}</p><div class="chips">${Object.keys(D).map(k=>`<button class="chip${k===j?" on":""}" data-j="${k}">${D[k].n}</button>`).join("")}</div><div class="ends"><span>← ${d.q}</span><span>${d.p} →</span></div><input type="range" id="sl" min="${d.min}" max="${d.max}" step="1" value="${x}" aria-label="${d.n} movement"><div class="read" id="read"></div><p class="tip"><b>${d.n}:</b> ${d.tip}</p><button class="btn" id="rs">Reset to neutral</button>`;upd()}
+function upd(){const j=sel[mode],x=VALS[mode][j];$("#stage").innerHTML=stageSVG(mode,VALS[mode],j,true);$("#read").innerHTML=`<span class="big">${term(mode,j,x)}</span><span>${unit(mode,j,x)}</span>`}
+
+/* ---------- study mode ---------- */
+let Q=null,sc={r:0,t:0,s:0},showGhost=true;
+const CAT={fe:["Flexion","Extension"],vv:["Valgus","Varus"],rot:["Internal rotation","External rotation"]},VIEW={fe:"Side view",vv:"Front view",rot:"Front view + joint close-up"},
+ql=t=>t==="Coxa valga"?"Valgus":t==="Coxa vara"?"Varus":t;
+function newQ(){const m=pick(["fe","vv","rot"]),j=pick(Object.keys(DEF[m])),d=DEF[m][j],hip=m==="vv"&&j==="hip";let x;
+if(hip)x=Math.random()<.5?ri(100,114):ri(142,158);
+else if(m==="fe"&&d.min===0)x=Math.random()<.25?0:ri(40,d.max-15);
+else{const up=Math.random()<.5;x=up?ri(d.max*.4,d.max*.9):-ri(-d.min*.4,-d.min*.9)}
+const pos=hip?x>125:x>0,ok=ql(pos?d.p:d.q),opp=ql(pos?d.q:d.p),oth=Object.keys(CAT).filter(k=>k!==m).map(k=>pick(CAT[k]));
+Q={m,j,x,ok,opts:shuf([ok,opp,...oth]),done:false,pick:null}}
+const cls=o=>!Q.done?"":o===Q.ok?" good":o===Q.pick?" bad":"";
+function quiz(){if(!Q)newQ();const d=DEF[Q.m][Q.j],V={...Z[Q.m],[Q.j]:Q.x},right=Q.pick===Q.ok;
+$("#stage").innerHTML=stageSVG(Q.m,V,Q.j,showGhost);
+$("#panel").innerHTML=`<p class="meta">${VIEW[Q.m]} · <b>${d.n}</b></p><p class="rule">Which term describes how this joint has moved away from neutral${showGhost?" (faint outline)":""}?</p><div class="opts">${Q.opts.map(o=>`<button class="opt${cls(o)}" data-o="${o}"${Q.done?" disabled":""}>${o}</button>`).join("")}</div>${Q.done?`<div class="fb ${right?"good":"bad"}"><b>${right?"Correct.":"Not quite."}</b> Answer: ${Q.ok}. ${d.tip}</div><button class="btn" id="nx">Next question</button>`:""}<p class="score">Score ${sc.r}/${sc.t} · streak ${sc.s}</p><label class="ck"><input type="checkbox" id="gh"${showGhost?" checked":""}> Show neutral outline</label>`}
+
+/* ---------- wiring ---------- */
+const TABS=[["fe","Flexion / Extension"],["vv","Valgus / Varus"],["rot","Rotation"],["quiz","Study mode"]];
+function render(){$("#tabs").innerHTML=TABS.map(([k,t])=>`<button class="tab${k===mode?" on":""}" data-m="${k}">${t}</button>`).join("");mode==="quiz"?quiz():explore()}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+if(t.dataset.m){mode=t.dataset.m;render()}
+else if(t.dataset.j){sel[mode]=t.dataset.j;explore()}
+else if(t.id==="rs"){VALS[mode][sel[mode]]=Z[mode][sel[mode]];explore()}
+else if(t.dataset.o&&!Q.done){Q.pick=t.dataset.o;Q.done=true;sc.t++;if(Q.pick===Q.ok){sc.r++;sc.s++}else sc.s=0;quiz()}
+else if(t.id==="nx"){newQ();quiz()}});
+document.addEventListener("input",e=>{if(e.target.id==="sl"){VALS[mode][sel[mode]]=+e.target.value;upd()}});
+document.addEventListener("change",e=>{if(e.target.id==="gh"){showGhost=e.target.checked;quiz()}});
+render();
+</script></body></html>
