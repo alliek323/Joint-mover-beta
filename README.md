@@ -20,7 +20,7 @@ Open `index.html` in a browser (or host it with GitHub Pages).
 ## Known caveats / next ideas
 - Geometry is schematic, not to scale. The hip close-up assumes about 15° of femoral neck anteversion; tuberosity positions in the shoulder close-up are approximate. Please verify against an anatomy atlas.
 - The rotation figures have not had a thorough visual review on all screen sizes.
-- Ideas: abduction/adduction, pronation/supination, more joints in the quiz, a hard mode with no labels, spaced-repetition of missed terms.
+- Ideas: abduction/adduction, pronation/supination, more joints in the quiz, a hard mode with no labels, spaced-repetition of missed terms, option to plant ankles, integrate pathology.
 
 ## Reference
 Flexion/extension conventions follow https://tommorrison.uk/blog/flexion--extension-in-detail
